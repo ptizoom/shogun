@@ -221,7 +221,7 @@ distclean:
 #
 #
 
-.PHONY:run-testsuite src perl-all perl-conf
+.PHONY:run-testsuite src perl-all perl-conf tests perl-all
 
 
 perl-conf:
@@ -230,11 +230,14 @@ perl-conf:
 perl-all: perl-conf src
 
 src:
-	$(MAKE) -C $@
+	$(MAKE) -C src
 
+#tests: LD_LIBRARY_PATH="/usr/src/shogun/src/interfaces/perldl_modular:/usr/src/shogun/src/shogun"
+tests:
+	$(MAKE) -C src shogun/Makefile $@
 
 run-testsuite:
-	$(MAKE) -C src $@
+	$(MAKE) -C src shogun/Makefile $@
 
 TAGS:
 	cd src;etags $(SRCFILES)

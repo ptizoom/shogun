@@ -25,6 +25,9 @@ configure.log
 *.oct
 .localvimrc
 
+*~
+\#*\#
+
 # /doc/
 /doc/html
 /doc/html_cn
@@ -97,3 +100,8 @@ examples/undocumented/python_modular/*
 
 # /tests
 /tests/unit/shogun-unit-test
+
+
+# git modules
+/doc/tutorial
+/data

@@ -146,16 +146,6 @@ template<class ST> void CStringFeatures<ST>::cleanup()
 		}
 	}
 
-	/*
-	if (single_string)
-	{
-		SG_FREE(single_string);
-		single_string=NULL;
-	}
-	else
-		cleanup_feature_vectors(0, num_vectors-1);
-	*/
-
 	num_vectors=0;
 	SG_FREE(features);
 	SG_FREE(symbol_mask_table);
@@ -170,42 +160,6 @@ template<class ST> void CStringFeatures<ST>::cleanup()
 	SG_UNREF(alphabet);
 	alphabet=alpha;
 	SG_REF(alphabet);
-}
-
-template<class ST> void CStringFeatures<ST>::cleanup_feature_vector(int32_t num)
-{
-	ASSERT(num<get_num_vectors());
-
-	/*
-	if (features)
-	{
-		int32_t real_num=m_subset_stack->subset_idx_conversion(num);
-		SG_FREE(features[real_num].string);
-		features[real_num].string=NULL;
-		features[real_num].slen=0;
-
-		determine_maximum_string_length();
-	}
-	*/
-}
-
-template<class ST> void CStringFeatures<ST>::cleanup_feature_vectors(int32_t start, int32_t stop)
-{
-	if (features && get_num_vectors())
-	{
-		ASSERT(start<get_num_vectors());
-		ASSERT(stop<get_num_vectors());
-
-		/*
-		for (int32_t i=start; i<=stop; i++)
-		{
-			int32_t real_num=m_subset_stack->subset_idx_conversion(i);
-			SG_FREE(features[real_num].string);
-			features[real_num].string=NULL;
-			features[real_num].slen=0;
-		}*/
-		determine_maximum_string_length();
-	}
 }
 
 template<class ST> EFeatureClass CStringFeatures<ST>::get_feature_class() const { return C_STRING; }
@@ -257,9 +211,7 @@ template<class ST> void CStringFeatures<ST>::set_feature_vector(SGVector<ST> vec
 	if (vector.vlen<=0)
 		SG_ERROR("String has zero or negative length\n");
 
-	cleanup_feature_vector(num);
-	features[num].slen=vector.vlen;
-	features[num].string=SG_MALLOC(ST, vector.vlen);
+	features[num] = SGString<ST>(vector.vlen);
 	memcpy(features[num].string, vector.vector, vector.vlen*sizeof(ST));
 
 	determine_maximum_string_length();
@@ -644,6 +596,7 @@ template<class ST> bool CStringFeatures<ST>::load_fasta_file(const char* fname, 
 				}
 
 				len=fasta_len-spanned_lines;
+				new (&strings[i]) SGString<ST>();
 				strings[i].string=SG_MALLOC(ST, len);
 				strings[i].slen=len;
 
@@ -953,6 +906,8 @@ template<class ST> bool CStringFeatures<ST>::append_features(SGString<ST>* p_fea
 
 		for (int32_t i=0; i<num_vectors; i++)
 		{
+			new (&new_features[i]) SGString<ST>();
+
 			if (i<old_num_vectors)
 			{
 				new_features[i].string=features[i].string;
@@ -1008,6 +963,7 @@ template<class ST> SGString<ST>* CStringFeatures<ST>::copy_features(int32_t& num
 		int32_t len;
 		bool free_vec;
 		ST* vec=get_feature_vector(i, len, free_vec);
+		new (&new_feat[i]) SGString<ST>();
 		new_feat[i].string=SG_MALLOC(ST, len);
 		new_feat[i].slen=len;
 		memcpy(new_feat[i].string, vec, ((size_t) len) * sizeof(ST));
@@ -1087,9 +1043,7 @@ template<class ST> bool CStringFeatures<ST>::load_compressed(char* src, bool dec
 		// vector raw data
 		if (decompress)
 		{
-			new (&features[i]) SGString<ST>();
-			features[i].string=SG_MALLOC(ST, len_uncompressed);
-			features[i].slen=len_uncompressed;
+			new (&features[i]) SGString<ST>(len_uncompressed);
 			uint8_t* compressed=SG_MALLOC(uint8_t, len_compressed);
 			if (fread(compressed, sizeof(uint8_t), len_compressed, file)!=(size_t) len_compressed)
 				SG_ERROR("failed to read compressed data (expected %d bytes)", len_compressed);
@@ -1103,8 +1057,7 @@ template<class ST> bool CStringFeatures<ST>::load_compressed(char* src, bool dec
 		else
 		{
 			int32_t offs=CMath::ceil(2.0*sizeof(int32_t)/sizeof(ST));
-			features[i].string=SG_MALLOC(ST, len_compressed+offs);
-			features[i].slen=len_compressed+offs;
+			new (&features[i]) SGString<ST>(len_compressed+offs);
 			int32_t* feat32ptr=((int32_t*) (features[i].string));
 			memset(features[i].string, 0, offs*sizeof(ST));
 			feat32ptr[0]=(int32_t) len_compressed;
@@ -1522,6 +1475,7 @@ template<class ST> void CStringFeatures<ST>::create_random(float64_t* hist, int3
 
 	for (int32_t i=0; i<num_vec; i++)
 	{
+		new (&sf[i]) SGString<ST>();
 		sf[i].string=SG_MALLOC(ST, cols);
 		sf[i].slen=cols;
 

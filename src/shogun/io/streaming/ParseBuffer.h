@@ -149,13 +149,19 @@ public:
 	 *
 	 * @param destroy free examples on destruction or not
 	 */
-	void set_free_vectors_on_destruct(bool destroy) { free_vectors_on_destruct = destroy; }
+	void set_free_vectors_on_destruct(bool destroy)
+	{
+		free_vectors_on_destruct = destroy;
+	}
 
 	/**
 	 * Return whether all example objects will be freed
 	 * on destruction.
 	 */
-	bool get_free_vectors_on_destruct() { return free_vectors_on_destruct; }
+	bool get_free_vectors_on_destruct()
+	{
+		return free_vectors_on_destruct;
+	}
 
 	/**
 	 * Return the name of the object
@@ -217,8 +223,8 @@ template <class T> CParseBuffer<T>::CParseBuffer(int32_t size)
 	ex_used = SG_MALLOC(E_IS_EXAMPLE_USED, ring_size);
 	ex_in_use_mutex = SG_MALLOC(pthread_mutex_t, ring_size);
 	ex_in_use_cond = SG_MALLOC(pthread_cond_t, ring_size);
-	read_lock = new pthread_mutex_t;
-	write_lock = new pthread_mutex_t;
+	read_lock = SG_MALLOC(pthread_mutex_t, 1);
+	write_lock = SG_MALLOC(pthread_mutex_t, 1);
 
 	SG_SINFO("Initialized with ring size: %d.\n", ring_size);
 
@@ -228,8 +234,11 @@ template <class T> CParseBuffer<T>::CParseBuffer(int32_t size)
 	for (int32_t i=0; i<ring_size; i++)
 	{
 		ex_used[i] = E_EMPTY;
-		ex_ring[i].fv.vector = new T();
-		ex_ring[i].fv.vlen = 1;
+
+		/* this closes a memory leak, seems to have no bad consequences,
+		 * but I am not completely sure due to lack of any tests */
+//		ex_ring[i].fv.vector = SG_MALLOC(T, 1);
+//		ex_ring[i].fv.vlen = 1;
 		ex_ring[i].label = FLT_MAX;
 
 		pthread_cond_init(&ex_in_use_cond[i], NULL);
@@ -246,7 +255,11 @@ template <class T> CParseBuffer<T>::~CParseBuffer()
 	for (int32_t i=0; i<ring_size; i++)
 	{
 		if (ex_ring[i].fv.vector != NULL && free_vectors_on_destruct)
-			delete ex_ring[i].fv.vector;
+		{
+			SG_DEBUG("%s::~%s(): destroying examples ring vector %d at %p\n",
+					get_name(), get_name(), i, ex_ring[i].fv.vector);
+			SG_FREE(ex_ring[i].fv.vector);
+		}
 		pthread_mutex_destroy(&ex_in_use_mutex[i]);
 		pthread_cond_destroy(&ex_in_use_cond[i]);
 	}
@@ -255,8 +268,8 @@ template <class T> CParseBuffer<T>::~CParseBuffer()
 	SG_FREE(ex_in_use_mutex);
 	SG_FREE(ex_in_use_cond);
 
-	delete read_lock;
-	delete write_lock;
+	SG_FREE(read_lock);
+	SG_FREE(write_lock);
 }
 
 template <class T>
@@ -335,7 +348,7 @@ void CParseBuffer<T>::finalize_example(bool free_after_release)
 		SG_DEBUG("Freeing object in ring at index %d and address: %p.\n",
 			 ex_read_index, ex_ring[ex_read_index].fv.vector);
 
-		delete ex_ring[ex_read_index].fv.vector;
+		SG_FREE(ex_ring[ex_read_index].fv.vector);
 		ex_ring[ex_read_index].fv.vector=NULL;
 	}
 

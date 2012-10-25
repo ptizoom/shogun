@@ -110,7 +110,8 @@ enum EKernelType
 	K_DIRECTOR = 480,
 	K_PRODUCT = 490,
 	K_LINEARARD = 500,
-	K_GAUSSIANARD = 510
+	K_GAUSSIANARD = 510,
+	K_STREAMING = 520
 };
 
 /** kernel property */
@@ -191,6 +192,8 @@ class CKernel : public CSGObject
 	friend class CDiceKernelNormalizer;
 	friend class CZeroMeanCenterKernelNormalizer;
 
+	friend class CStreamingKernel;
+
 	public:
 
 		/** default constructor
@@ -225,8 +228,8 @@ class CKernel : public CSGObject
 		inline float64_t kernel(int32_t idx_a, int32_t idx_b)
 		{
 			REQUIRE(idx_a>=0 && idx_b>=0 && idx_a<num_lhs && idx_b<num_rhs,
-				"Index out of Range: idx_a=%d/%d idx_b=%d/%d\n",
-				idx_a,num_lhs, idx_b,num_rhs);
+				"%s::kernel(): index out of Range: idx_a=%d/%d idx_b=%d/%d\n",
+				get_name(), idx_a,num_lhs, idx_b,num_rhs);
 
 			return normalizer->normalize(compute(idx_a, idx_b), idx_a, idx_b);
 		}
@@ -238,6 +241,31 @@ class CKernel : public CSGObject
 		SGMatrix<float64_t> get_kernel_matrix()
 		{
 			return get_kernel_matrix<float64_t>();
+		}
+
+		/** @return Vector with diagonal elements of the kernel matrix.
+		 * Note that left- and right-handside features must be set and of equal
+		 * size
+		 */
+		SGVector<float64_t> get_kernel_diagonal()
+		{
+			REQUIRE(lhs, "CKernel::get_kernel_diagonal(): Left-handside "
+					"features missing!\n");
+
+			REQUIRE(rhs, "CKernel::get_kernel_diagonal(): Right-handside "
+						"features missing!\n");
+
+			REQUIRE(lhs->get_num_vectors()==rhs->get_num_vectors(),
+					"CKernel::get_kernel_diagonal(): Left- and right-"
+					"handside features must be equal sized\n");
+
+			/* note that features are asserted to be of equal size */
+			SGVector<float64_t> diagonal(lhs->get_num_vectors());
+
+			for (index_t i=0; i<diagonal.vlen; ++i)
+				diagonal[i]=kernel(i, i);
+
+			return diagonal;
 		}
 
 		/**

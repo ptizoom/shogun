@@ -15,10 +15,12 @@
 
 %{
 
-extern "C" {
-#include  <pdl.h>
-#include  <pdlcore.h>
-}
+#ifndef SWIG_FILE_WITH_INIT
+#  define NO_IMPORT_ARRAY
+#else
+  void import_array() {}
+#endif
+
 #include <shogun/lib/DataType.h>
 
     /* Functions to extract array attributes.

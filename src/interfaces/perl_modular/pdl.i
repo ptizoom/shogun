@@ -17,12 +17,8 @@
 
 %{
 
-extern "C" {
-#include  <pdl.h>
-#include <pdlcore.h>
 #include  <values.h>
-}
-    //PTZ121012 from PDL
+//PTZ121012 from PDL
 #define MAX_DIMENSIONS 100
 #define MAX_VAR_DIMS 32
 
@@ -82,165 +78,165 @@ extern "C" {
                 }
                 //PDL_COMMENT("The package to bless output vars into is taken from the first input var")
 #endif
-                it = PDL->SvPDLV(a);
-            }
-            return it;
-        }
+      it = PDL->SvPDLV(a);
+    }
+    return it;
+  }
 
-        //is there such think
-        //  return (int) PyArray_TYPE(a);
-        //maybe we talk about MAGIC
-        //but perl does not care any types can be put in a array...
-        //pdl *p = SvPDLV(a);
-        //SV* a = p->sv;
-        //return SvTYPE(SvRV(a));
-        //Basic/Core/pdlapi.c
+  //is there such think
+  //  return (int) PyArray_TYPE(a);
+  //maybe we talk about MAGIC
+  //but perl does not care any types can be put in a array...
+  //pdl *p = SvPDLV(a);
+  //SV* a = p->sv;
+  //return SvTYPE(SvRV(a));
+  //Basic/Core/pdlapi.c
+  
+  static int array_type(SV* sv) {
+    pdl* it = PDL->SvPDLV(sv);
+    return it->datatype;
+  }
 
-        static int array_type(SV* sv) {
-            pdl* it = PDL->SvPDLV(sv);
-            return it->datatype;
-        }
+  static bool is_array(SV* a) {
+    return SVavref(a);
+  }
 
-        static bool is_array(SV* a) {
-            return SVavref(a);
-        }
+  static bool is_piddle(SV* a) {
+    return(if_piddle(a) != 0 ? true : false);
+  }
 
-        static bool is_piddle(SV* a) {
-            return(if_piddle(a) != 0 ? true : false);
-        }
+  static int array_dimensions(SV* sv) {
+    pdl* it = if_piddle(sv);
+    if(it->state & PDL_NOMYDIMS) {
+      return -1; //NODIMS?
+    }
+    return it->ndims;
+  }
 
-        static int array_dimensions(SV* sv) {
-            pdl* it = if_piddle(sv);
-            if(it->state & PDL_NOMYDIMS) {
-                return -1; //NODIMS?
-            }
-            return it->ndims;
-        }
-
-        //
-        static size_t array_size(SV* sv, int i) {
-            pdl* x = if_piddle(sv);
-            pdl_make_physvaffine( x );
-            //size_t *incs = (PDL_VAFFOK(x) ? x->vafftrans->incs : x->dimincs);
-            //return it->dimincs;
-            return x->nvals;
-        }
-
-        static bool array_is_contiguous(SV* sv) {
-            //PTZ120930 can we call XS_PDL_iscontig(sv); line 342 "Core.xs"
-            pdl* x = SvPDLV(sv);
-            int RETVAL = true;
-            pdl_make_physvaffine( x );
-            if PDL_VAFFOK(x) {
-                int i, inc=1;
-                printf("vaff check...\n");
-                for (i=0;i<x->ndims;i++) {
-                    if (PDL_REPRINC(x,i) != inc) {
-                        RETVAL = false;
-                        break;
-                    }
-                    inc *= x->dims[i];
-                }
-            }
-            //  pdl* it = SvPDLV(sv);
-            //  return (it->state & (PDL_ALLOCATED | PDL_HDRCPY));
-            //PTZ120927 needs to check... in 
-            return RETVAL;
-        }
+  //
+  static size_t array_size(SV* sv, int i) {
+    pdl* x = if_piddle(sv);
+    pdl_make_physvaffine( x );
+    //size_t *incs = (PDL_VAFFOK(x) ? x->vafftrans->incs : x->dimincs);
+    //return it->dimincs;
+    return x->nvals;
+  }
+  
+  static bool array_is_contiguous(SV* sv) {
+    //PTZ120930 can we call XS_PDL_iscontig(sv); line 342 "Core.xs"
+    pdl*	x = SvPDLV(sv);
+    int	RETVAL = true;
+    pdl_make_physvaffine( x );
+    if PDL_VAFFOK(x) {
+	int i, inc=1;
+	printf("vaff check...\n");
+	for (i=0;i<x->ndims;i++) {
+	  if (PDL_REPRINC(x,i) != inc) {
+	    RETVAL = false;
+	    break;
+	  }
+	  inc *= x->dims[i];
+	}
+      }
+    //  pdl* it = SvPDLV(sv);
+    //  return (it->state & (PDL_ALLOCATED | PDL_HDRCPY));
+    //PTZ120927 needs to check... in 
+    return RETVAL;
+  }
 
 
-        static bool is_pdl_narry(SV* sv, int ndims_min, int ndims_max)
-        {
-            pdl* it = if_piddle(sv);
-            if(it != 0) {
-                pdl_make_physdims(it);
-                if((!(it->state & PDL_NOMYDIMS))
-                        && it->ndims >= ndims_min
-                        && it->ndims < ndims_max) {
-                    return true;
-                }
-            } else if(is_array(sv)) {
-                return true;
-            }
-            return false;
-        }
+  static bool is_pdl_narry(SV* sv, int ndims_min, int ndims_max)
+  {
+    pdl* it = if_piddle(sv);
+    if(it != 0) {
+      pdl_make_physdims(it);
+      if((!(it->state & PDL_NOMYDIMS))
+	 && it->ndims >= ndims_min
+	 && it->ndims < ndims_max) {
+	return true;
+      }
+    } else if(is_array(sv)) {
+      return true;
+    }
+    return false;
+  }
 
-        static int is_pdl_vector(SV* sv, int typecode)
-        {
-            return(is_pdl_narry(sv, 1, 2));
-        }
-        //check  for rectangular matrix (2D)
-        static int is_pdl_matrix(SV* sv, int typecode)
-        {
-            return(is_pdl_narry(sv, 2, 3));
-        }
+  static int is_pdl_vector(SV* sv, int typecode)
+  {
+    return(is_pdl_narry(sv, 1, 2));
+  }
+  //check  for rectangular matrix (2D)
+  static int is_pdl_matrix(SV* sv, int typecode)
+  {
+    return(is_pdl_narry(sv, 2, 3));
+  }
 
-        //check  for PDL (rectangular) array N-ary
-        static int is_pdl_array(SV* sv, int typecode)
-        {
-            return(is_pdl_narry(sv, 3, MAX_DIMENSIONS));
-        }
+  //check  for PDL (rectangular) array N-ary
+  static int is_pdl_array(SV* sv, int typecode)
+  {
+    return(is_pdl_narry(sv, 3, MAX_DIMENSIONS));
+  }
 
-        //check  for sparse? matrix (2D) 
-        static int is_pdl_sparse_matrix(SV* sv, int typecode)
-        {
-            return(array_is_contiguous(sv) && is_pdl_matrix(sv, typecode));
+  //check  for sparse? matrix (2D) 
+  static int is_pdl_sparse_matrix(SV* sv, int typecode)
+  {
+  return(array_is_contiguous(sv) && is_pdl_matrix(sv, typecode));
 #if 0
-            return ( obj && SV_HasAttrString(obj, "indptr") &&
-                    SV_HasAttrString(obj, "indices") &&
-                    SV_HasAttrString(obj, "data") &&
-                    SV_HasAttrString(obj, "shape")
-                   ) ? 1 : 0;
+  return ( obj && SV_HasAttrString(obj, "indptr") &&
+	   SV_HasAttrString(obj, "indices") &&
+	   SV_HasAttrString(obj, "data") &&
+	   SV_HasAttrString(obj, "shape")
+	   ) ? 1 : 0;
 #endif
-        }
+  }
 
-        //PTZ121011... check dims >= 2 and dims[-1] == 1
-        static int is_pdl_string(SV* sv, int typecode)
-        {
-            pdl* it = if_piddle(sv);
-            if(it != 0) {
-                return (it->datatype == typecode);
-            }
-            return false;
-        }
+  //PTZ121011... check dims >= 2 and dims[-1] == 1
+static int is_pdl_string(SV* sv, int typecode)
+{
+  pdl* it = if_piddle(sv);
+  if(it != 0) {
+    return (it->datatype == typecode);
+  }
+  return false;
+}
 
-        static int is_pdl_string_list(SV* sv, int typecode)
-        {
-            pdl* it = PDL->SvPDLV(sv);
-            return (it->datatype == typecode);
-            //PTZ120927 for now
+static int is_pdl_string_list(SV* sv, int typecode)
+{
+  pdl* it = PDL->SvPDLV(sv);
+  return (it->datatype == typecode);
+  //PTZ120927 for now
 
 #if 0
-            SV* list=(SV*) obj;
-            int result=0;
-            if (list && PyList_Check(list) && PyList_Size(list)>0)
+    SV* list=(SV*) obj;
+    int result=0;
+    if (list && PyList_Check(list) && PyList_Size(list)>0)
+    {
+        result=1;
+        int32_t size=PyList_Size(list);
+        for (int32_t i=0; i<size; i++)
+        {
+            SV *o = PyList_GetItem(list,i);
+            if (typecode == NPY_STRING || typecode == NPY_UNICODE)
             {
-                result=1;
-                int32_t size=PyList_Size(list);
-                for (int32_t i=0; i<size; i++)
+				if (!PyString_Check(o))
                 {
-                    SV *o = PyList_GetItem(list,i);
-                    if (typecode == NPY_STRING || typecode == NPY_UNICODE)
-                    {
-                        if (!PyString_Check(o))
-                        {
-                            result=0;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        if (!is_array(o) || array_dimensions(o)!=1 || array_type(o) != typecode)
-                        {
-                            result=0;
-                            break;
-                        }
-                    }
+                    result=0;
+                    break;
                 }
             }
-            return result;
-#endif
+            else
+            {
+                if (!is_array(o) || array_dimensions(o)!=1 || array_type(o) != typecode)
+                {
+                    result=0;
+                    break;
+                }
+            }
         }
+    }
+    return result;
+#endif
+}
 
 
 
@@ -305,68 +301,68 @@ extern "C" {
                 case PDL_F: retval = PDL->bvals.Float; break;
                 case PDL_D: retval = PDL->bvals.Double; break;
 
-                default:
-                            croak("Unknown type sent to pdl_get_badvalue\n");
-            }
-            return retval;
-        } /* pdl_get_badvalue() */
+      default:
+	croak("Unknown type sent to pdl_get_badvalue\n");
+    }
+    return retval;
+} /* pdl_get_badvalue() */
 
 
-        double pdl_get_pdl_badvalue( pdl *it ) {
-            double retval;
-            int datatype;
+double pdl_get_pdl_badvalue( pdl *it ) {
+    double retval;
+    int datatype;
 
 
-            datatype = it->datatype;
-            retval = pdl_get_badvalue( datatype );
-            return retval;
-        } /* pdl_get_pdl_badvalue() */
+    datatype = it->datatype;
+    retval = pdl_get_badvalue( datatype );
+    return retval;
+} /* pdl_get_pdl_badvalue() */
 
 
-        //line 23 pdlcore.c
-        static SV* getref_pdl(pdl* it) {
-            SV* newref;
-            if(!it->sv) {
-                SV *ref;
-                HV *stash = gv_stashpv("PDL",TRUE);
-                SV *psv = newSViv(PTR2IV(it));
-                it->sv = psv;
-                newref =  newRV_noinc((SV*) it->sv);
-                (void) sv_bless(newref,stash);
-            } else {
-                newref = newRV_inc((SV*)it->sv);
-                SvAMAGIC_on(newref);
-            }
-            return newref;
-        }
+//line 23 pdlcore.c
+ static SV* getref_pdl(pdl* it) {
+   SV* newref;
+   if(!it->sv) {
+     SV *ref;
+     HV *stash = gv_stashpv("PDL",TRUE);
+     SV *psv = newSViv(PTR2IV(it));
+     it->sv = psv;
+     newref =  newRV_noinc((SV*) it->sv);
+     (void) sv_bless(newref,stash);
+   } else {
+     newref = newRV_inc((SV*)it->sv);
+     SvAMAGIC_on(newref);
+   }
+   return newref;
+ }
 
-        void pdl_make_scratch_hash(pdl *ret,double data, int datatype) {
-            STRLEN n_a;
-            HV *hash;
-            SV *dat; PDL_Long fake[1];
+void pdl_make_scratch_hash(pdl *ret,double data, int datatype) {
+    STRLEN n_a;
+    HV *hash;
+    SV *dat; PDL_Long fake[1];
 
-            /* Compress to smallest available type. This may have strange
-               results sometimes :( */
-            ret->datatype = datatype;
-            ret->data = pdl_malloc(pdl_howbig(ret->datatype)); /* Wasteful */
-            //PTZ121004, yo, maybe need data PDL_B?
-            dat = newSVpv((char *)ret->data, pdl_howbig(ret->datatype));
+    /* Compress to smallest available type. This may have strange
+       results sometimes :( */
+    ret->datatype = datatype;
+    ret->data = pdl_malloc(pdl_howbig(ret->datatype)); /* Wasteful */
+    //PTZ121004, yo, maybe need data PDL_B?
+    dat = newSVpv((char *)ret->data, pdl_howbig(ret->datatype));
 
-            ret->data = SvPV(dat, n_a);
-            ret->datasv = dat;
+    ret->data = SvPV(dat, n_a);
+    ret->datasv = dat;
 
-            /* This is an important point: it makes this whole piddle mortal
-             * so destruction will happen at the right time.
-             * If there are dangling references, pdlapi.c knows not to actually
-             * destroy the C struct. */
-            sv_2mortal(getref_pdl(ret));
-
-            pdl_setdims(ret, fake, 0); /* However, there are 0 dims in scalar */
-            ret->nvals = 1;
-
-            /* NULLs should be ok because no dimensions. */
-            pdl_set(ret->data, ret->datatype, NULL, NULL, NULL, 0, 0, data);
-        }
+    /* This is an important point: it makes this whole piddle mortal
+     * so destruction will happen at the right time.
+     * If there are dangling references, pdlapi.c knows not to actually
+     * destroy the C struct. */
+    sv_2mortal(getref_pdl(ret));
+    
+    pdl_setdims(ret, fake, 0); /* However, there are 0 dims in scalar */
+    ret->nvals = 1;
+    
+    /* NULLs should be ok because no dimensions. */
+    pdl_set(ret->data, ret->datatype, NULL, NULL, NULL, 0, 0, data);
+}
 
 #if 0
 

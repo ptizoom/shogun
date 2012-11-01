@@ -13,6 +13,11 @@
 %feature("autodoc", "get_support_vectors(self) -> [] of int") get_support_vectors;
 %feature("autodoc", "get_alphas(self) -> [] of float") get_alphas;
 #endif
+#ifdef HAVE_PERL
+%feature("autodoc", "get_w(self) -> [] of float") get_w;
+%feature("autodoc", "get_support_vectors(self) -> [] of int") get_support_vectors;
+%feature("autodoc", "get_alphas(self) -> [] of float") get_alphas;
+#endif
 
 #ifdef USE_SWIG_DIRECTORS
 %feature("director") shogun::CDirectorLinearMachine;
@@ -45,7 +50,7 @@
 %rename(SubGradientLPM) CSubGradientLPM;
 %rename(SubGradientSVM) CSubGradientSVM;
 %rename(NewtonSVM) CNewtonSVM;
-#ifndef HAVE_PYTHON
+#if ! defined(SWIGPYTHON) && ! defined (SWIGPERL)
 %rename(SVM) CSVM;
 #endif
 %rename(SVMLin) CSVMLin;

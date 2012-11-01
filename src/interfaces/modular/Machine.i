@@ -1,6 +1,6 @@
 /*%warnfilter(302) apply;
 %warnfilter(302) apply_generic;*/
-#if defined(SWIGPYTHON) || defined(SWIGOCTAVE) || defined(SWIGRUBY) || defined(SWIGLUA) || defined(SWIGR)
+#if defined(SWIGPYTHON) || defined(SWIGPERL) || defined(SWIGOCTAVE) || defined(SWIGRUBY) || defined(SWIGLUA) || defined(SWIGR)
 
 %define APPLY_MULTICLASS(CLASS)
     %extend CLASS

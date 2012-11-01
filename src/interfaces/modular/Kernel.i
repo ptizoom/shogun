@@ -11,6 +11,16 @@
 %feature("autodoc", "get_kernel_matrix(self) -> numpy 2dim array of float") get_kernel_matrix;
 %feature("autodoc", "get_POIM2(self) -> [] of float") get_POIM2;
 #endif
+#ifdef HAVE_PERL
+%feature("autodoc", "get_kernel_matrix(self) -> PDL 2dim array of float") get_kernel_matrix;
+%feature("autodoc", "get_POIM2(self) -> [] of float") get_POIM2;
+#endif
+
+
+#ifdef HAVE_PERL
+%feature("autodoc", "get_kernel_matrix(self) -> numpy 2dim array of float") get_kernel_matrix;
+%feature("autodoc", "get_POIM2(self) -> [] of float") get_POIM2;
+#endif
 
 %ignore CWeightedDegreePositionStringKernel::set_position_weights(float64_t*);
 
@@ -23,7 +33,7 @@
 }
 #endif
 
-#ifndef SWIGPYTHON
+#if ! defined(SWIGPYTHON) && ! defined (SWIGPERL)
 #define PROTOCOLS_CUSTOMKERNEL(class_name, type_name, format_str, typecode)
 #define EXTEND_CUSTOMKERNEL(class_name, type_name, typecode)
 #endif

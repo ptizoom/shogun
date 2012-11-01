@@ -14,6 +14,13 @@
 %feature("autodoc", "get_log_transition_probs(self) -> numpy 1dim array of %float") get_log_transition_probs;
 %feature("autodoc", "get_transition_probs(self) -> numpy 1dim array of %float") get_transition_probs;
 #endif
+#ifdef HAVE_PERL
+%feature("autodoc", "get_log_likelihood(self) -> PDL 1dim array of float") get_log_likelihood;
+%feature("autodoc", "get_histogram(self) -> PDL 1dim array of float") get_histogram;
+%feature("autodoc", "get_log_transition_probs(self) -> PDL 1dim array of %float") get_log_transition_probs;
+%feature("autodoc", "get_transition_probs(self) -> PDL 1dim array of %float") get_transition_probs;
+#endif
+
 
 /* Remove C Prefix */
 %rename(Distribution) CDistribution;

@@ -21,13 +21,15 @@ BEGIN {
 }
 #PTZ121030 we have to test all this...
 sub EXPECT_EQ {
-    &ok($_[0] == $_[1]);
+    &is($_[0], $_[1]) or &diag(caller(), " check this ");
 }
 sub EXPECT_TRUE {
-    &ok(@_);
+    &ok(@_) or &diag(caller(), "::check this::", $@, @_);
 }
 
 @vtypes = qw/ULongInt Int Real Word Byte Char Bool ShortReal LongInt/;
+
+@vtypes = qw/Char ULongInt Int Real Word Byte Bool ShortReal LongInt/;
 
 
 =pod
@@ -114,7 +116,11 @@ sub TEST_ctor
     eval($a->zero());
     ok(!$@);
     for ( $i=0; $i < 10; ++$i) {
-	&EXPECT_EQ(0, $a->get_element($i));
+	$ai = $a->get_element($i);
+	if($T =~ /Char/) {
+	    $ai = ord $ai;
+	}
+	&EXPECT_EQ(0, $ai);
     }
 
     $dv = 3.3;
@@ -126,7 +132,11 @@ sub TEST_ctor
     eval($a->set_const($v));
     ok(!$@);
     for ( $i=0; $i < 10; ++$i) {
-	&EXPECT_EQ($v, $a->get_element($i));
+	$ai = $a->get_element($i);
+	if($T =~ /Char/) {
+	    $ai = ord $ai;
+	}
+	&EXPECT_EQ($v, $ai);
     }
     ok($a_clone_v = *{$funv . '::clone_vector'}->($a->{vector}, $a->{vlen}));
     
@@ -147,36 +157,44 @@ sub TEST_ctor
     }
 }
 sub TEST_add
-{
+{# testing adding of modshogun::BoolVector
     my ($class, $T) = @_;
     my $funv= eval 'modshogun::'. $T . $class;
     diag('testing adding of ' . 'modshogun::'. $T . $class );
 
     ok($a = $funv->new(10));
     ok($b = $funv->new(10));
-    eval $a->random(0.0, 1024.0);
+    $n = 1024.0;
+    if($T =~ /Byte|Char/) { $n = 127.0 }
+    #if($T =~ /Bool/) { $n = 1.0 }
+    
+    eval $a->random(0.0, $n);
     ok(!$@);
-    eval $b->random(0.0, 1024.0);
+    eval $b->random(0.0, $n);
     ok(!$@);
 
     ok($b_clone_v = *{$funv . '::clone_vector'}->($b->{vector}, $b->{vlen}));
     ok($c = $funv->new($b_clone_v, 10, 1));
 
-#TODO::PTZ121101 Can't locate object method "swig_PDL_get"
-# via package "modshogun::ULongIntVector"
-# at /usr/src/shogun/src/interfaces/perl_modular/modshogun.pm line 33.
-#TODO::PTZ121101 need a typemap...  ::add(::ULongIntVector, ::ULongIntVector)
     eval $c->add($a);
     ok(!$@);
     for($i = 0; $i < $c->{vlen}; ++$i) {
-	&EXPECT_EQ($a->get_element($i) + $b->get_element($i), $c->get_element($i));
+	if($T =~ /Char/) {
+	    &EXPECT_EQ(ord($a->get_element($i)) + ord($b->get_element($i)), ord($c->get_element($i)));
+	} else {
+	    &EXPECT_EQ($a->get_element($i) + $b->get_element($i), $c->get_element($i));
+	}
     }
-#TODO::PTZ121101 op+ is not yet overloaded to (add)...!
-#it just does a sum of all elements or the pointers!
-    ok($c = $a + $a);
-    &EXPECT_EQ($c->{vlen}, 10);
-    for ( $i=0; $i < $c->{vlen}; ++$i) {
-	&EXPECT_EQ($c->get_element($i), 2*$a->get_element($i));
+
+    $c = $a + $a;
+    &is(ref($c), 'PDL');
+    &EXPECT_EQ($c->nelem, $a->{vlen});
+    for ( $i=0; $i < $a->{vlen}; ++$i) {
+	if($T =~ /Char/) {
+	    &EXPECT_EQ($c->at($i), 2 * ord($a->get_element($i)));
+	} else {
+	    &EXPECT_EQ($c->at($i), 2*$a->get_element($i));
+	}
     }
 }
 sub TEST_dot
@@ -186,104 +204,204 @@ sub TEST_dot
     diag('testing dot product of ' . 'modshogun::'. $T . $class );
 
     my $a = $funv->new(10);
-    $a->random(0.0, 1024.0);
+    $n = 1024.0;
+    if($T =~ /Byte|Char/) { $n = 127.0 }
+    $a->random(0.0, $n);
    
     my $dot_val = 0.0;
     for (my $i = 0; $i < $a->{vlen}; ++$i) {
-	$dot_val += $a->get_element($i) * $a->get_element($i);
+	if($T =~ /Char/) {
+	    $dot_val += ord($a->get_element($i)) ** 2;
+	} else {
+	    $dot_val += $a->get_element($i) * $a->get_element($i);
+	}
     }
     my $a_dot;
-    &ok($a_dot = $a->dot($a->{vector},$a->{vector},$a->{vlen}));
-    &ok( $error = modshogun::CMath::abs->($dot_val - $a_dot));
+    &ok($a_dot = *{$funv . '::dot'}->($a->{vector}, $a->{vector}, $a->{vlen}));
+    $error = abs($dot_val - $a_dot);
     
     &EXPECT_TRUE($error < 10E-10);
 }
+
+sub TEST_norm
+{
+    my ($class, $T) = @_;
+    my $funv= eval 'modshogun::'. $T . $class;
+    diag('testing norm of ' . 'modshogun::'. $T . $class );
+    
+    my $a = $funv->new(10);
+    $n = 1024.0;
+    $n0 = -50.;
+    if($T =~ /Byte|Char/) { $n = 127.0; }
+    if($T =~ /U|Byte|Bool|Word/) { $n0 = 0.0; }
+    #if($T =~ /Bool/) { $n = 1; }
+
+    #Unsigned
+    $a->random($n0, $n);
+    
+    #/* check l-2 norm */	
+    $a_dot = *{$funv . '::dot'}->($a->{vector}, $a->{vector}, $a->{vlen});
+    $l2_norm = modshogun::Math::sqrt($a_dot);
+
+    unless($T =~ /Char|Bool/) {
+	$error = abs($l2_norm - *{$funv . '::twonorm'}->($a->{vector}, $a->{vlen}));
+	&EXPECT_TRUE($error < 10E-12);
+    }
+    $l1_norm = 0.0;
+    for (my $i = 0; $i < $a->{vlen}; ++$i) {
+	if($T =~ /Char/) {
+	    $l1_norm += ord($a->get_element($i));
+	    
+	} else {
+	    $l1_norm += abs($a->get_element($i));
+	}
+    }
+    &EXPECT_EQ($l1_norm, *{$funv . '::onenorm'}->($a->{vector}, $a->{vlen}));
+
+    my $b = $funv->new(10);
+
+    $b->set_const(1.0);
+    &EXPECT_EQ(10.0, *{$funv .   '::qsq'}->($b->{vector}, $b->{vlen}, 0.5));
+    &EXPECT_EQ(100,  *{$funv . '::qnorm'}->($b->{vector}, $b->{vlen}, 0.5));
+}
+
+
+sub TEST_misc
+{
+    my ($class, $T) = @_;
+    my $funv= eval 'modshogun::'. $T . $class;
+    diag('testing miscelenia of ' . 'modshogun::'. $T . $class );
+    
+    my $a = $funv->new(10);
+    $n = 1024.0;
+    $n0 = -1024.;
+    if($T =~ /Byte|Char/) { $n = 127.0; }
+    if($T =~ /U|Byte|Bool|Word/) { $n0 = 0.0; }
+
+    #/* test, min, max, sum */
+    $min = 1025;
+    $max = -1025;
+    $sum = 0.0;
+    $sum_abs = 0.0;
+    for (my $i = 0; $i < $a->{vlen}; ++$i) {
+	my $ai=$a->get_element($i);
+	if($T =~ /Char/) {
+	    $ai = ord($ai);
+	}
+	$sum += $ai;
+	$sum_abs += abs($ai);
+	if ($ai > $max) {
+	    $max = $ai;
+	}
+	if ($ai < $min) {
+	    $min = $ai;
+	}
+    }
+    &EXPECT_EQ($min, *{$funv . '::min'}->($a->{vector}, $a->{vlen}));
+    &EXPECT_EQ($max, *{$funv . '::max'}->($a->{vector}, $a->{vlen}));
+    &EXPECT_EQ($sum, *{$funv . '::sum'}->($a->{vector}, $a->{vlen}));
+    &EXPECT_EQ($sum_abs, *{$funv . '::sum_abs'}->($a->{vector}, $a->{vlen}));
+
+    #/* test ::vector_multiply(...) */
+    my $c = $funv->new(10);
+    *{$funv . '::vector_multiply'}->($c->{vector}, $a->{vector}, $a->{vector}, $a->{vlen});
+    for($i = 0; $i < $c->{vlen}; ++$i) {
+	my $ai=$a->get_element($i);
+	my $ci=$c->get_element($i);
+	if($T =~ /Char/) {
+	    $ai = ord($ai);
+	    $ci = ord($ci);	    
+	}
+	&EXPECT_EQ($ci, $ai ** 2);
+    }
+
+    #/* test ::add(...) */
+    my ($alpha, $beta) = (1.5, 1.3);
+     if($T =~/Real/) {
+	 ($alpha, $beta) = (1.5, 1.3);
+     } else {
+	 ($alpha, $beta) = (15, 13);
+	 
+     }
+    *{$funv . '::add'}->($c->{vector}, $alpha, $a->{vector}, $beta, $a->{vector}, $a->{vlen});
+    for($i = 0; $i < $c->{vlen}; ++$i) {
+	my $ai=$a->get_element($i);
+	my $ci=$c->get_element($i);
+	if($T =~ /Char/) {
+	    $ai = ord($ai);
+	    $ci = ord($ci);	    
+	}
+	&EXPECT_EQ($ci, $alpha * $ai + $beta * $ai);
+    }
+
+    #/* tests ::add_scalar */
+    if($T =~ /U|Byte|Bool|Word/) { $n0 = 2.; }
+    else {$n0 = -1.;}
+    *{$funv . '::scale_vector'}->($n0, $a->{vector}, $a->{vlen});
+    $a_clone_v = *{$funv . '::clone_vector'}->($a->{vector}, $a->{vlen});
+
+    $b = $funv->new($a_clone_v, $a->{vlen}, 0);
+    *{$funv . '::add_scalar'}->($alpha + $beta, $b->{vector}, $b->{vlen});
+    for($i = 0; $i < $c->{vlen}; ++$i) {
+	my $ai=$a->get_element($i);
+	my $bi=$b->get_element($i);
+	if($T =~ /Char/) {
+	    $ai = ord($ai);
+	    $bi = ord($bi);	    
+	}
+	&EXPECT_EQ($bi, $ai + $alpha + $beta);
+    }
+    $b_clone_v = *{$funv . '::clone_vector'}->($b->{vector}, $b->{vlen});
+    $d = $funv->new($b_clone_v, $b->{vlen}, 0);
+
+    #makes sens only with float32/64_t I guess..SWIGTYPE_p_double SWIGTYPE_p_float
+    return unless($T =~ /Real/);
+    *{$funv . '::vec1_plus_scalar_times_vec2'}->($d->{vector}, $beta, $d->{vector}, $d->{vlen});
+    for($i = 0; $i < $d->{vlen}; ++$i) {
+	my $di=$d->get_element($i);
+	my $bi=$b->get_element($i);
+	if($T =~ /Char/) {
+	    $di = ord($di);
+	    $bi = ord($bi);	    
+	}
+	&EXPECT_EQ($di, $bi + $beta * $bi);
+    }
+}
+
 
 foreach $tp (@vtypes) {
     &TEST_ctor('Vector', $tp);
     &TEST_add ('Vector', $tp);
     &TEST_dot ('Vector', $tp);
+    &TEST_norm('Vector', $tp);
+    &TEST_misc('Vector', $tp);
 }
 
 END {
-    done_testing(100);
+    done_testing(1080);
 }
 
 __END__
+# testing norm of modshogun::BoolVector
+[1;31m[ERROR][0m Sorry, not yet implemented .
+ at /usr/src/shogun/src/perl/t/t020_SGVector.t line 225
+	main::TEST_norm('Vector', 'Bool') called at /usr/src/shogun/src/perl/t/t020_SGVector.t line 323
+
+# testing norm of modshogun::CharVector
+#   Failed test at /usr/src/shogun/src/perl/t/t020_SGVector.t line 24.
+not ok 714
+
+#   Failed test at /usr/src/shogun/src/perl/t/t020_SGVector.t line 24.
+*** glibc detected *** /usr/bin/perl: corrupted double-linked list: 0x00000000040b7ca0 ***
+
+# testing instanciators of modshogun::BoolVector
+ok 715
+*** glibc detected *** /usr/bin/perl: corrupted double-linked list: 0x0000000003d0bc30 ***
 
 
-
-
-TEST(SGVectorTest,norm)
-{
-	SGVector<float64_t> a(10);
-	a.random(-50.0, 1024.0);
-
-	/* check l-2 norm */
-	float64_t l2_norm = CMath::sqrt(a.dot(a.vector,a.vector, a.vlen));
-	float64_t error = CMath::abs(l2_norm - SGVector<float64_t>::twonorm(a.vector, a.vlen));
-	EXPECT_TRUE(error < 10E-12);
-
-	float64_t l1_norm = 0.0;
-	for (int32_t i = 0; i < a.vlen; ++i)
-		l1_norm += CMath::abs(a[i]);
-	EXPECT_EQ(l1_norm, SGVector<float64_t>::onenorm(a.vector, a.vlen));
-
-	SGVector<float64_t> b(10);
-	b.set_const(1.0);
-	EXPECT_EQ(10.0,SGVector<float64_t>::qsq(b.vector, b.vlen, 0.5));
-
-	EXPECT_EQ(100,SGVector<float64_t>::qnorm(b.vector, b.vlen, 0.5));
-}
-
-TEST(SGVectorTest,misc)
-{
-	SGVector<float64_t> a(10);
-	a.random(-1024.0, 1024.0);
-	
-	/* test, min, max, sum */
-	float64_t min = 1025, max = -1025, sum = 0.0, sum_abs = 0.0;
-	for (int32_t i = 0; i < a.vlen; ++i)
-	{
-		sum += a[i];
-		sum_abs += CMath::abs(a[i]);
-		if (a[i] > max)
-			max = a[i];
-		if (a[i] < min)
-			min = a[i];
-	}
-	
-	EXPECT_EQ(min, SGVector<float64_t>::min(a.vector,a.vlen));
-	EXPECT_EQ(max, SGVector<float64_t>::max(a.vector,a.vlen));
-	EXPECT_EQ(sum, SGVector<float64_t>::sum(a.vector,a.vlen));
-	EXPECT_EQ(sum_abs, SGVector<float64_t>::sum_abs(a.vector, a.vlen));
-
-	/* test ::vector_multiply(...) */
-	SGVector<float64_t> c(10);
-	SGVector<float64_t>::vector_multiply(c.vector, a.vector, a.vector, a.vlen);
-	for (int32_t i = 0; i < c.vlen; ++i)
-		EXPECT_EQ(c[i], a[i]*a[i]);
-
-	/* test ::add(...) */
-	SGVector<float64_t>::add(c.vector, 1.5, a.vector, 1.3, a.vector, a.vlen);
-	for (int32_t i = 0; i < a.vlen; ++i)
-		EXPECT_EQ(c[i],1.5*a[i]+1.3*a[i]);
-
-	/* tests ::add_scalar */
-	SGVector<float64_t>::scale_vector(-1.0,a.vector, a.vlen);
-	float64_t* a_clone = SGVector<float64_t>::clone_vector(a.vector, a.vlen);
-	SGVector<float64_t> b(a_clone, 10);
-	SGVector<float64_t>::add_scalar(1.1, b.vector, b.vlen);
-	for (int32_t i = 0; i < b.vlen; ++i)
-		EXPECT_EQ(b[i],a[i]+1.1);
-
-	float64_t* b_clone = SGVector<float64_t>::clone_vector(b.vector, b.vlen);
-	SGVector<float64_t> d(b_clone, b.vlen);
-	SGVector<float64_t>::vec1_plus_scalar_times_vec2(d.vector, 1.3, d.vector, b.vlen);
-	for (int32_t i = 0; i < d.vlen; ++i)
-		EXPECT_EQ(d[i],b[i]+1.3*b[i]);
-}
-
+stack?
+ _wrap_ULongIntVector_vec1_plus_scalar_times_vec2
+...?!
 
 my $b = pdl(1);
 
@@ -474,31 +592,6 @@ ok(isempty $ai );
 
 
 __END__
-
-# modshogun::BinaryLabels;
-# *obtain_from_generic = *modshogunc::BinaryLabels_obtain_from_generic;
-# *ensure_valid = *modshogunc::BinaryLabels_ensure_valid;
-# *scores_to_probabilities = *modshogunc::BinaryLabels_scores_to_probabilities;
-# ############# Class : modshogun::DenseLabels ##############
-# #@ISA = qw( modshogun::Labels modshogun );
-# *ensure_valid = *modshogunc::DenseLabels_ensure_valid;
-# *load = *modshogunc::DenseLabels_load;
-# *save = *modshogunc::DenseLabels_save;
-# *set_label = *modshogunc::DenseLabels_set_label;
-# *set_int_label = *modshogunc::DenseLabels_set_int_label;
-# *get_label = *modshogunc::DenseLabels_get_label;
-# *get_int_label = *modshogunc::DenseLabels_get_int_label;
-# *get_labels = *modshogunc::DenseLabels_get_labels;
-# *get_labels_copy = *modshogunc::DenseLabels_get_labels_copy;
-# *set_labels = *modshogunc::DenseLabels_set_labels;
-# *set_to_one = *modshogunc::DenseLabels_set_to_one;
-# *zero = *modshogunc::DenseLabels_zero;
-# *set_to_const = *modshogunc::DenseLabels_set_to_const;
-# *get_int_labels = *modshogunc::DenseLabels_get_int_labels;
-# *set_int_labels = *modshogunc::DenseLabels_set_int_labels;
-# *REJECTION_LABEL = *modshogunc::DenseLabels_REJECTION_LABEL;
-# *REJECTION_LABEL = *modshogunc::DenseLabels_REJECTION_LABEL;
-
 
 <sonne|work>:
  create some matrix

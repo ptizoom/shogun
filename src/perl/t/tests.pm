@@ -13,6 +13,7 @@ use Tie::IxHash;
 use Storable;
 use ExtUtils::Command::MM;
 
+$ENV{PERL_DEBUG_MSTATS} = 1;
 
 BEGIN {
 #use Find::Lib;

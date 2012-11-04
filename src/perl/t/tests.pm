@@ -182,6 +182,19 @@ sub translate_and_show {
 }
 
 
+sub EXPECT_EQ {
+    &is($_[0], $_[1]) or &diag(caller(), "::check this::");
+}
+sub EXPECT_TRUE {
+    &ok($_[0]) or &diag(caller(), "::check this::", $@, @_);
+}
+
+sub SG_UNREF {
+    eval undef $_[0];
+    ok(!$@) or &diag(caller(), "::check this::", $@, @_);
+}
+
+@vtypes = qw/Char ULongInt Int Real Word Byte Bool ShortReal LongInt/;
 
 
 

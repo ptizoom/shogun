@@ -17,26 +17,31 @@ BEGIN {
 	exit;
     }
 }
-using namespace shogun;
+
 
 sub TEST_MulticlassOCASTest_train
 {
-  float64_t C = 1.0;
-  index_t num_samples = 50, num_gauss = 3, dim = 3;
-  CMath::init_random(5);
-  SGMatrix<float64_t> data =
+
+$C = 1.0;
+$num_samples = 50;
+$num_gauss = 3;
+$dim = 3;
+
+  #CMath::init_random(5);
+  #SGMatrix<float64_t>
+ $data =
     CDataGenerator::generate_gaussians(num_samples, num_gauss, dim);
   CDenseFeatures<float64_t> features(data);
 
   index_t set_size = data.num_cols/2;
-  SGVector<index_t> train_idx(set_size), test_idx(set_size);
-  SGVector<float64_t> labels(set_size);
+  SGVector<index_t> train_idx($set_size), test_idx($set_size);
+  SGVector<float64_t> labels($set_size);
   for (index_t i = 0, j = 0; i < data.num_cols; ++i)
   {
-    if (i % 2 == 0)
-      train_idx[j] = i;
+    if ($i % 2 == 0)
+      $train_idx[$j] = i;
     else
-      test_idx[j++] = i;
+      $test_idx[$j++] = i;
 
     if (i < data.num_cols/num_gauss)
       labels[i/2] = 0.0;
